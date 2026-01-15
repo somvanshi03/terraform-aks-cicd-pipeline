@@ -1,0 +1,91 @@
+name: Deploy to AKS with Helm (user image tag)
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: "Target environment/namespace"
+        required: true
+        default: "dev"
+        type: choice
+        options:
+          - dev
+          - qa
+          - stage
+          - uat
+          - prod
+      image_tag:
+        description: "Docker image tag to deploy (e.g., 1.0.12 or git sha)"
+        required: true
+        type: string
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # ---------------------------
+      # Azure Login (Service Principal)
+      # ---------------------------
+      - name: Azure Login
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+          client-secret: ${{ secrets.AZURE_CLIENT_SECRET }}
+
+      # ---------------------------
+      # Set AKS context (kubeconfig)
+      # ---------------------------
+      - name: Set AKS Context
+        uses: azure/aks-set-context@v4
+        with:
+          resource-group: ${{ secrets.AKS_RESOURCE_GROUP }}
+          cluster-name: ${{ secrets.AKS_CLUSTER_NAME }}
+
+      # ---------------------------
+      # Install Helm
+      # ---------------------------
+      - name: Setup Helm
+        uses: azure/setup-helm@v4
+
+      # ---------------------------
+      # Deploy / Update using Helm
+      # ---------------------------
+      - name: Helm upgrade/install with user image tag
+        env:
+          NAMESPACE: ${{ github.event.inputs.environment }}
+          IMAGE_TAG: ${{ github.event.inputs.image_tag }}
+        run: |
+          set -euo pipefail
+
+          if [ -z "$IMAGE_TAG" ]; then
+            echo "ERROR: image_tag input is required"
+            exit 1
+          fi
+
+          echo "Deploying to namespace: $NAMESPACE"
+          echo "Using image tag:        $IMAGE_TAG"
+
+          # Change these to match your repo/chart
+          RELEASE_NAME="my-app"
+          CHART_PATH="./helm/my-app"
+
+          helm upgrade --install "$RELEASE_NAME" "$CHART_PATH" \
+            --namespace "$NAMESPACE" \
+            --create-namespace \
+            --set image.tag="$IMAGE_TAG" \
+            --atomic \
+            --timeout 10m
+
+      # Optional: show deployed resources
+      - name: Verify rollout
+        env:
+          NAMESPACE: ${{ github.event.inputs.environment }}
+        run: |
+          kubectl get deploy -n "$NAMESPACE"
+          kubectl get pods -n "$NAMESPACE" -o wide
