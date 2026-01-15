@@ -1,4 +1,4 @@
-name: Deploy to AKS with Helm (user image tag)
+name: Deploy to AKS
 
 on:
   workflow_dispatch:
