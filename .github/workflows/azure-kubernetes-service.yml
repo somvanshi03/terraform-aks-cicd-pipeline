@@ -1,22 +1,24 @@
-name: Deploy to AKS
+name: Deploy to AKS with Helm (inputs: image tag + optional service port)
 
 on:
   workflow_dispatch:
     inputs:
       environment:
-        description: "Target environment/namespace"
+        description: "Target namespace/environment"
         required: true
         default: "dev"
         type: choice
-        options:
-          - dev
-          - qa
-          - stage
-          - uat
-          - prod
+        options: [dev, qa, stage, uat, prod]
+
       image_tag:
-        description: "Docker image tag to deploy (e.g., 1.0.12 or git sha)"
+        description: "Docker image tag to deploy (required)"
         required: true
+        type: string
+
+      service_port:
+        description: "Service port (optional). Leave empty to use chart default."
+        required: false
+        default: ""
         type: string
 
 jobs:
@@ -39,53 +41,77 @@ jobs:
           client-secret: ${{ secrets.AZURE_CLIENT_SECRET }}
 
       # ---------------------------
-      # Set AKS context (kubeconfig)
+      # Set AKS Context
       # ---------------------------
-      - name: Set AKS Context
+      - name: Set AKS context
         uses: azure/aks-set-context@v4
         with:
           resource-group: ${{ secrets.AKS_RESOURCE_GROUP }}
           cluster-name: ${{ secrets.AKS_CLUSTER_NAME }}
 
       # ---------------------------
-      # Install Helm
+      # Setup Helm
       # ---------------------------
       - name: Setup Helm
         uses: azure/setup-helm@v4
 
       # ---------------------------
-      # Deploy / Update using Helm
+      # Deploy with Helm
       # ---------------------------
-      - name: Helm upgrade/install with user image tag
+      - name: Helm upgrade/install
         env:
           NAMESPACE: ${{ github.event.inputs.environment }}
           IMAGE_TAG: ${{ github.event.inputs.image_tag }}
+          SERVICE_PORT: ${{ github.event.inputs.service_port }}
         run: |
           set -euo pipefail
 
           if [ -z "$IMAGE_TAG" ]; then
-            echo "ERROR: image_tag input is required"
+            echo "ERROR: image_tag is required"
             exit 1
           fi
 
-          echo "Deploying to namespace: $NAMESPACE"
-          echo "Using image tag:        $IMAGE_TAG"
-
-          # Change these to match your repo/chart
           RELEASE_NAME="my-app"
           CHART_PATH="./helm/my-app"
 
-          helm upgrade --install "$RELEASE_NAME" "$CHART_PATH" \
-            --namespace "$NAMESPACE" \
-            --create-namespace \
-            --set image.tag="$IMAGE_TAG" \
-            --atomic \
-            --timeout 10m
+          echo "Deploying release: $RELEASE_NAME"
+          echo "Namespace:         $NAMESPACE"
+          echo "Image tag:         $IMAGE_TAG"
+          if [ -n "$SERVICE_PORT" ]; then
+            echo "Service port:      $SERVICE_PORT (override)"
+          else
+            echo "Service port:      (using chart default)"
+          fi
 
-      # Optional: show deployed resources
+          # Base helm args (always set image tag)
+          HELM_ARGS=(
+            upgrade --install "$RELEASE_NAME" "$CHART_PATH"
+            --namespace "$NAMESPACE"
+            --create-namespace
+            --set "image.tag=$IMAGE_TAG"
+            --atomic
+            --timeout 10m
+          )
+
+          # Optional: override service port only if user provided it
+          # Change 'service.port' if your chart uses a different key.
+          if [ -n "$SERVICE_PORT" ]; then
+            # Basic numeric validation
+            if ! echo "$SERVICE_PORT" | grep -Eq '^[0-9]+$'; then
+              echo "ERROR: service_port must be a number (got: $SERVICE_PORT)"
+              exit 1
+            fi
+            HELM_ARGS+=( --set "service.port=$SERVICE_PORT" )
+          fi
+
+          helm "${HELM_ARGS[@]}"
+
+      # ---------------------------
+      # Verify rollout (optional)
+      # ---------------------------
       - name: Verify rollout
         env:
           NAMESPACE: ${{ github.event.inputs.environment }}
         run: |
-          kubectl get deploy -n "$NAMESPACE"
+          kubectl get deploy,svc -n "$NAMESPACE"
           kubectl get pods -n "$NAMESPACE" -o wide
