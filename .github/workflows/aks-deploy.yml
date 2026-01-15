@@ -1,4 +1,4 @@
-name: Deploy to AKS with Helm (inputs: image tag + optional service port)
+name: Deploy to AKS 
 
 on:
   workflow_dispatch:
