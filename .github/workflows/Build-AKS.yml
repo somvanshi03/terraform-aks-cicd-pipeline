@@ -49,6 +49,15 @@ jobs:
           "ARM_TENANT_ID=\(.tenantId)\n" +
           "ARM_SUBSCRIPTION_ID=\(.subscriptionId)\n"
           ' >> $GITHUB_ENV
+          
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.6.6
+
+      - name: Terraform Version
+        run: terraform -version
+
       - name: Terraform Init (Remote State)
         working-directory: ${{ env.TF_DIR }}
         run: >
