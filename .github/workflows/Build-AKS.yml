@@ -26,6 +26,16 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        
+      - name: Debug repo layout
+        run: |
+          pwd
+          ls -la
+          echo "Terraform files:"
+          find . -maxdepth 3 -name "*.tf" -print
+          echo "Directories:"
+          find . -maxdepth 2 -type d -print
+
 
       - name: Azure Login
         uses: azure/login@v2
