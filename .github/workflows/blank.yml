@@ -1,12 +1,12 @@
+---
 name: Provision AKS with Terraform
-
 on:
   workflow_dispatch:
     inputs:
       environment:
-        description: "Environment"
+        description: Environment
         required: true
-        default: "dev"
+        default: dev
         type: choice
         options:
           - dev
@@ -15,74 +15,59 @@ on:
           - uat
           - prod
       action:
-        description: "Terraform action"
+        description: Terraform action
         required: true
-        default: "apply"
+        default: apply
         type: choice
         options:
           - plan
           - apply
           - destroy
-
 permissions:
   id-token: write
   contents: read
-
 jobs:
   terraform:
     runs-on: ubuntu-latest
-    env:
-      ARM_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
-      ARM_CLIENT_SECRET: ${{ secrets.AZURE_CLIENT_SECRET }}
-      ARM_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
-      ARM_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
-
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-
-      # Login to Azure
       - name: Azure Login
         uses: azure/login@v2
         with:
-          creds: >
-            {"clientId":"${{ secrets.AZURE_CLIENT_ID }}",
-             "clientSecret":"${{ secrets.AZURE_CLIENT_SECRET }}",
-             "tenantId":"${{ secrets.AZURE_TENANT_ID }}",
-             "subscriptionId":"${{ secrets.AZURE_SUBSCRIPTION_ID }}"}
-
-      # Terraform
+          creds: ${{ secrets.AZURE_AKS_CREDENTIALS }}
+          enable-AzPSSession: false
+          environment: azurecloud
+          allow-no-subscriptions: false
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v3
         with:
           terraform_version: 1.6.6
-
       - name: Terraform Init (Remote State)
         working-directory: infra
-        run: |
+        run: >
           terraform init \
             -backend-config="resource_group_name=${{ secrets.TFSTATE_RG }}" \
             -backend-config="storage_account_name=${{ secrets.TFSTATE_STORAGE_ACCOUNT }}" \
             -backend-config="container_name=${{ secrets.TFSTATE_CONTAINER }}" \
             -backend-config="key=${{ secrets.TFSTATE_KEY }}"
-
       - name: Terraform Validate
         working-directory: infra
         run: terraform validate
-
       - name: Terraform Plan
+        if: ${{ github.event.inputs.action == 'plan' || github.event.inputs.action ==
+          'apply' }}
         working-directory: infra
         run: |
           terraform plan \
             -var="environment=${{ github.event.inputs.environment }}" \
             -out=tfplan
-
       - name: Terraform Apply
         if: ${{ github.event.inputs.action == 'apply' }}
         working-directory: infra
         run: terraform apply -auto-approve tfplan
-
       - name: Terraform Destroy
         if: ${{ github.event.inputs.action == 'destroy' }}
         working-directory: infra
-        run: terraform destroy -auto-approve -var="environment=${{ github.event.inputs.environment }}"
+        run: terraform destroy -auto-approve -var="environment=${{
+          github.event.inputs.environment }}"
