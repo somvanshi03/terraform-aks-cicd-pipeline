@@ -65,7 +65,7 @@ resource "azurerm_kubernetes_cluster" "aks" {
 
     # requirement: node count 1, autoscaler min=1 max=2
     node_count           = var.node_count
-    enable_auto_scaling  = true
+    auto_scaling_enabled = true
     min_count            = var.autoscaler_min_count
     max_count            = var.autoscaler_max_count
   }
@@ -75,14 +75,6 @@ resource "azurerm_kubernetes_cluster" "aks" {
 
     ssh_key {
       key_data = tls_private_key.ssh.public_key_openssh
-    }
-  }
-
-  # Enable Application Gateway Ingress Controller add-on
-  addon_profile {
-    ingress_application_gateway {
-      enabled    = true
-      subnet_id  = azurerm_subnet.appgw.id
     }
   }
 
