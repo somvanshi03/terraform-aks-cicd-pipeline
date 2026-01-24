@@ -46,7 +46,7 @@ variable "appgw_subnet_name" {
 variable "appgw_subnet_cidr" {
   type        = string
   description = "App Gateway subnet CIDR"
-  default     = "10.225.0.0/16"
+  default     = "10.245.0.0/16"
 }
 
 variable "aks_name" {
