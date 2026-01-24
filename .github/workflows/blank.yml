@@ -36,9 +36,8 @@ jobs:
         uses: azure/login@v2
         with:
           creds: ${{ secrets.AZURE_AKS_CREDENTIALS }}
-          enable-AzPSSession: false
-          environment: azurecloud
-          allow-no-subscriptions: false
+        enable-AzPSSession: false
+        environment: azurecloud
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v3
         with:
