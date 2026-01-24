@@ -25,7 +25,7 @@ variable "vnet_name" {
 variable "vnet_cidr" {
   type        = string
   description = "VNet CIDR range"
-  default     = "10.244.0.0/12"
+  default     = "10.240.0.0/12"
 }
 
 variable "aks_subnet_name" {
