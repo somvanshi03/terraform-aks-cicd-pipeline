@@ -1,5 +1,5 @@
 ---
-name: Provision AKS with Terraform
+name: 1.Provision AKS with Terraform
 on:
   workflow_dispatch:
     inputs:

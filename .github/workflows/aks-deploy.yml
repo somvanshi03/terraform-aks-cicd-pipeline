@@ -1,4 +1,4 @@
-name: Deploy to AKS 
+name: 2.Deploy to AKS 
 
 on:
   workflow_dispatch:
