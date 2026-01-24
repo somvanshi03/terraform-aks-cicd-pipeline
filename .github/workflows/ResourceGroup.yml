@@ -1,0 +1,77 @@
+name: List and Delete Azure Resource Group
+
+on:
+  workflow_dispatch:
+    inputs:
+      action:
+        description: "What do you want to do?"
+        required: true
+        type: choice
+        default: list
+        options:
+          - list
+          - delete
+      resource_group_name:
+        description: "Resource group to delete (required only when action=delete)"
+        required: false
+        default: ""
+      confirm_delete:
+        description: 'Type DELETE to confirm (required only when action=delete)'
+        required: false
+        default: ""
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  rg:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Azure Login
+        uses: azure/login@v2
+        with:
+          creds: ${{ secrets.AZURE_AKS_CREDENTIALS }}
+          enable-AzPSSession: false
+          environment: azurecloud
+
+      - name: List Resource Groups
+        if: ${{ github.event.inputs.action == 'list' }}
+        run: |
+          echo "Listing all resource groups in subscription:"
+          az group list --query "[].{name:name, location:location}" -o table
+
+      - name: Validate delete inputs
+        if: ${{ github.event.inputs.action == 'delete' }}
+        run: |
+          if [ -z "${{ github.event.inputs.resource_group_name }}" ]; then
+            echo "ERROR: resource_group_name is required when action=delete"
+            exit 1
+          fi
+
+          if [ "${{ github.event.inputs.confirm_delete }}" != "DELETE" ]; then
+            echo "ERROR: confirm_delete must be exactly 'DELETE' to proceed"
+            exit 1
+          fi
+
+      - name: Show RG details before delete
+        if: ${{ github.event.inputs.action == 'delete' }}
+        run: |
+          RG="${{ github.event.inputs.resource_group_name }}"
+          echo "Resource group to delete: $RG"
+          echo "Details:"
+          az group show -n "$RG" -o table
+
+          echo ""
+          echo "Resources inside RG (top 200):"
+          az resource list -g "$RG" --query "[].{name:name,type:type,location:location}" -o table | head -n 220 || true
+
+      - name: Delete Resource Group
+        if: ${{ github.event.inputs.action == 'delete' }}
+        run: |
+          RG="${{ github.event.inputs.resource_group_name }}"
+          echo "Deleting resource group: $RG"
+          az group delete -n "$RG" --yes --no-wait
+
+          echo "Delete started (no-wait). You can check status with:"
+          echo "az group exists -n \"$RG\""
