@@ -1,40 +1,35 @@
+---
 jobs:
   terraform:
     runs-on: ubuntu-latest
     env:
       TF_DIR: infra
-
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-
       - name: Azure Login
         uses: azure/login@v2
         with:
           creds: ${{ secrets.AZURE_AKS_CREDENTIALS }}
           enable-AzPSSession: false
           environment: azurecloud
-
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v3
         with:
           terraform_version: 1.6.6
-
       - name: Debug - confirm infra exists
         run: |
           pwd
           ls -la
           ls -la "${TF_DIR}"
-
       - name: Terraform Init (Remote State)
         working-directory: ${{ env.TF_DIR }}
-        run: |
+        run: >
           terraform init \
             -backend-config="resource_group_name=${{ secrets.TFSTATE_RG }}" \
             -backend-config="storage_account_name=${{ secrets.TFSTATE_STORAGE_ACCOUNT }}" \
             -backend-config="container_name=${{ secrets.TFSTATE_CONTAINER }}" \
             -backend-config="key=${{ secrets.TFSTATE_KEY }}"
-
       - name: Terraform Validate
         working-directory: ${{ env.TF_DIR }}
         run: terraform validate
